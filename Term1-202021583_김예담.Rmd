@@ -1,0 +1,118 @@
+---
+title: "term1_markdown"
+author: "김예담"
+date: '2021 6 1 '
+output: html_document
+---
+# sf package
+## sf package란?
+- 지도, 정확히는 ‘GIS’관련 전반적인 처리를 도와주는 패키지
+- GIS: Geographic Information System의 약자로, '지리 정보'를 수치, 지도화 하는 시스템을 의미
+```{r}
+#install.packages('sf') 
+library(sf) 
+```
+
+## sf 패키지의 기본 함수 1
+- st_point(x, c(numeric vector)) #점
+- st_multipoint(x = matrix)
+
+- st_linestring(x, c(numeric vector)) #선
+- st_multilinestring(x = list)
+
+- st_polygon(x = list) #면
+- st_multipolygon(x = list)
+
+### Point(점)와 Polygon(면)
+- 지리 정보 -> Points와 Polygon의 조합
+- point는 (x,y) 좌표 형식의 벡터를 st_point()에 통과
+- polygon은 points들을 합친 리스트로 선언
+
+```{r}
+point_example = st_point(c(100, 10))
+plot(point_example, axes = T)
+
+polygon_example = list(rbind(c(0,0), c(1,0), c(1,1), c(0,1), c(0,0))) %>% st_polygon
+plot(polygon_example, axes = T) #plot을 통해 눈으로 확인할 수 있습니다.
+```
+
+- st_multi~()는 하나의 행에 여러 개의 점이나 면을 할당하게 해줍니다.
+```{r}
+multipoint_example = st_multipoint(rbind(c(100,10), c(100.5))); plot(multipoint_example, axes = T)
+
+polygon_example2 = list(rbind(c(1,1), c(2,1), c(2,2), c(1,2), c(1,1))) %>% st_polygon #새로운 폴리곤 생성
+multipolygon_example = list(polygon_example, polygon_example2) %>% st_multipolygon #두 폴리곤 합치기
+
+plot(multipolygon_example, axes = T)
+```
+
+## sf 패키지의 기본함수 2; Geometric Confirmation
+- st_intersection() -> 겹침
+- st_within() -> 속함
+- st_union() -> 합침
+```{r}
+st_intersection(polygon_example, polygon_example2) #값을 반환합니다
+st_within(polygon_example, polygon_example2) #속하지 않으므로 'empty'를 반환합니다
+plot(st_union(polygon_example, polygon_example2))
+```
+
+# 지리공간 데이터 처리해보기
+## 1. 'spData' 패키지에 내장된 'world' data 사용
+```{r}
+#install.packages('spData')
+library(spData)
+str(world)
+```
+- world$geom에서 Geometry Type: multipolygon 확인 가능
+- Geodetic CRS: WGS 84
+  + 좌표계의 하나, 또 다른 대표적인 좌표계로 GRS80이 있음
+```{r}
+world$geom
+```
+
+## 2. plot을 이용해 시각화
+- sf 패키지에는 자체 지도 시각화 기능 plot()이 내장되어 있음
+```{r}
+plot(world, axes = TRUE) #axes 축 표시
+# 한번에 plot하면 범례가 표시되지 않는 문제가 있습니다.
+```
+
+- 한 항목씩 plot
+```{r}
+plot(world["lifeExp"], axes = TRUE) #범례값 조정은 break(c())를 이용해 세부적으로 조정가능합니다.
+plot(world["area_km2"], axes = TRUE)
+```
+
+## 3. 시/군/구 표현하기 (with. ggplot2)
+- ggplot을 이용해 원하는 GIS 시각화가 가능합니다 (sf 패키지의 장점)
+- sf는 polygon을 유용하게 다루는 패키지일 뿐, ggplot이나 tidyverse와 같은 시각화 패키지들과 함께 쓸 때 유용합니다.
+```{r}
+library(tidyverse)
+library(mapproj)
+library(ggplot2)
+kor <- read_sf("TL_SCCO_CTPRVN.shp")
+str(kor)
+
+#한글이 깨지기 때문에 인코딩을 uTF-8로 변경해줍니다
+kor$CTP_KOR_NM <- iconv(kor$CTP_KOR_NM, from = 'CP949', to = 'UTF-8', sub = NA, mark = TRUE, toRaw = FALSE)
+plot(kor["CTP_KOR_NM"])
+```
+
+```{r}
+kor_df <- fortify(as(kor, 'Spatial')) #시도 경계선 데이터프레임을 생성
+head(kor_df)
+```
+
+```{r}
+library(nord) #색 패키지
+kor_shp_ggplot <- kor_df %>% ggplot(aes(x = long, y = lat, group = group))
+kor_shp_ggplot+
+  geom_polygon(aes(fill = id), color = 'black', show.legend = FALSE)+
+  scale_fill_nord('lumina')+
+  theme_minimal()
+```
+
+```{r}
+geom_poly
+```
+
